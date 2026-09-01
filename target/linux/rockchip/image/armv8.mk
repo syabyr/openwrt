@@ -120,6 +120,15 @@ define Device/friendlyarm_nanopi-r3s
 endef
 TARGET_DEVICES += friendlyarm_nanopi-r3s
 
+define Device/embedfire_lubancat-1n
+  $(Device/rk3566)
+  DEVICE_VENDOR := EmbedFire
+  DEVICE_MODEL := LubanCat 1N
+  DEVICE_DTS := rk3566-lubancat-1n
+  UBOOT_DEVICE_NAME := nanopi-r3s-rk3566
+endef
+TARGET_DEVICES += embedfire_lubancat-1n
+
 define Device/friendlyarm_nanopi-r4s
   $(Device/rk3399)
   DEVICE_VENDOR := FriendlyARM

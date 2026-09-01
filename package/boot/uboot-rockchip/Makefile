@@ -210,7 +210,8 @@ define U-Boot/nanopi-r3s-rk3566
   $(U-Boot/rk3566/Default)
   NAME:=NanoPi R3S
   BUILD_DEVICES:= \
-    friendlyarm_nanopi-r3s
+    friendlyarm_nanopi-r3s \
+    embedfire_lubancat-1n
 endef
 
 define U-Boot/radxa-cm3-io-rk3566
