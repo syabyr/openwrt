@@ -125,7 +125,6 @@ define Device/embedfire_lubancat-1n
   DEVICE_VENDOR := EmbedFire
   DEVICE_MODEL := LubanCat 1N
   DEVICE_DTS := rk3566-lubancat-1n
-  UBOOT_DEVICE_NAME := nanopi-r3s-rk3566
 endef
 TARGET_DEVICES += embedfire_lubancat-1n
 

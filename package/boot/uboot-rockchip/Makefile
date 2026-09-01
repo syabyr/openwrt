@@ -210,7 +210,13 @@ define U-Boot/nanopi-r3s-rk3566
   $(U-Boot/rk3566/Default)
   NAME:=NanoPi R3S
   BUILD_DEVICES:= \
-    friendlyarm_nanopi-r3s \
+    friendlyarm_nanopi-r3s
+endef
+
+define U-Boot/lubancat-1n-rk3566
+  $(U-Boot/rk3566/Default)
+  NAME:=LubanCat 1N
+  BUILD_DEVICES:= \
     embedfire_lubancat-1n
 endef
 
@@ -432,6 +438,7 @@ UBOOT_TARGETS := \
   radxa-e20c-rk3528 \
   rock-2-rk3528 \
   nanopi-r3s-rk3566 \
+  lubancat-1n-rk3566 \
   radxa-cm3-io-rk3566 \
   radxa-zero-3-rk3566 \
   rock-3c-rk3566 \
