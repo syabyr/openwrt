@@ -37,7 +37,13 @@ rockchip_setup_interfaces()
 		ucidef_set_interfaces_lan_wan 'eth0 eth2' 'eth1'
 		;;
 	embedfire,lubancat-1n)
-		ucidef_set_interface_lan 'eth0'
+		# eth0 = gmac1 RGMII (WAN), eth1 = PCIe RTL NIC via r8169 (LAN),
+		# usb0 = RNDIS gadget (Type-C download port) bridged into br-lan so
+		# a PC on the RNDIS link gets an address from dnsmasq.
+		# Default LAN subnet 192.168.7.0/24 (same as the vendor rootfs).
+		ucidef_set_interface "lan" device "eth1 usb0" protocol static \
+			ipaddr "192.168.7.1" netmask "255.255.255.0"
+		ucidef_set_interface "wan" device "eth0" protocol dhcp
 		;;
 	linkease,easepi-r1)
 		ucidef_set_network_device_path eth2 'platform/3c0400000.pcie/pci0001:10/0001:10:00.0/0001:11:00.0'
