@@ -52,6 +52,7 @@ define Device/ti_am335x-bone-black
   DEVICE_VENDOR := Texas Instruments
   DEVICE_MODEL := AM335x BeagleBone Black
   DEVICE_DTS := am335x-boneblack
+  DEVICE_PACKAGES := kmod-pru-remoteproc
 endef
 
 TARGET_DEVICES += ti_am335x-bone-black
