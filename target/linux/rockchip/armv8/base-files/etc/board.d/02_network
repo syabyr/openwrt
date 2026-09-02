@@ -41,6 +41,9 @@ rockchip_setup_interfaces()
 		ucidef_set_network_device_path eth3 'platform/3c0000000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0'
 		ucidef_set_interfaces_lan_wan 'eth1 eth2 eth3' 'eth0'
 		;;
+	nsy,g68-plus)
+		ucidef_set_interfaces_lan_wan 'lan1 lan2 lan3 lan4' 'wan'
+		;;
 	radxa,e52c)
 		ucidef_set_network_device_path 'wan' 'platform/a40c00000.pcie/pci0003:30/0003:30:00.0/0003:31:00.0'
 		ucidef_set_network_device_path 'lan' 'platform/a41000000.pcie/pci0004:40/0004:40:00.0/0004:41:00.0'
@@ -80,7 +83,8 @@ rockchip_setup_macs()
 	friendlyarm,nanopi-r76s|\
 	hinlink,h28k|\
 	linkease,easepi-r1|\
-	lunzn,fastrhino-r66s)
+	lunzn,fastrhino-r66s|\
+	nsy,g68-plus)
 		wan_mac=$(macaddr_generate_from_mmc_cid mmcblk0)
 		lan_mac=$(macaddr_add "$wan_mac" 1)
 		;;

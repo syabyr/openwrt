@@ -208,6 +208,17 @@ define Device/lunzn_fastrhino-r66s
 endef
 TARGET_DEVICES += lunzn_fastrhino-r66s
 
+define Device/nsy_g68-plus
+  $(Device/rk3568)
+  DEVICE_VENDOR := NSY
+  DEVICE_MODEL := G68-Plus
+  DEVICE_DTS := rk3568-nsy-g68-plus
+  UBOOT_DEVICE_NAME := nsy-g68-plus-rk3568
+  DEVICE_PACKAGES := blkdiscard block-mount kmod-dsa-rtl8365mb \
+	kmod-mt7915e kmod-mt7916-firmware wpad-basic-mbedtls
+endef
+TARGET_DEVICES += nsy_g68-plus
+
 define Device/pine64_rock64
   $(Device/rk3328)
   DEVICE_VENDOR := Pine64

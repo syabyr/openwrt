@@ -279,6 +279,13 @@ define U-Boot/nanopi-r5s-rk3568
     friendlyarm_nanopi-r5s
 endef
 
+define U-Boot/nsy-g68-plus-rk3568
+  $(U-Boot/rk3568/Default)
+  NAME:=NSY G68-Plus
+  BUILD_DEVICES:= \
+    nsy_g68-plus
+endef
+
 define U-Boot/radxa-e25-rk3568
   $(U-Boot/rk3568/Default)
   DEPENDS+=+PACKAGE_u-boot-$(1):trusted-firmware-a-rk3568-tpl-e25
@@ -439,6 +446,7 @@ UBOOT_TARGETS := \
   fastrhino-r66s-rk3568 \
   nanopi-r5c-rk3568 \
   nanopi-r5s-rk3568 \
+  nsy-g68-plus-rk3568 \
   radxa-e25-rk3568 \
   rock-3a-rk3568 \
   rock-3b-rk3568 \
