@@ -1,0 +1,69 @@
+From: syabyr <syabyr@github.com>
+Date: Wed, 2 Sep 2026 12:10:00 +0800
+Subject: [PATCH] phy: rockchip: inno-usb2: skip OTG sm for peripheral mode
+
+The OTG state machine and BC1.2 charger detection run for every port
+whose controller dr_mode is neither "host" nor unknown, including
+peripheral-only ports.  A peripheral port is owned by a USB gadget
+controller (e.g. dwc3 in gadget mode) that keeps the PHY powered while
+its gadget driver is bound.
+
+On such ports the OTG machinery is harmful: when utmi_bvalid reads 0
+(or flaps) while the gadget is enumerated, the charger detect work
+toggles the controller into non-driving mode and powers the PHY off,
+and the OTG state machine's UNDEFINED/DCP paths power the PHY off too -
+killing the active gadget connection a few seconds after enumeration.
+On the EmbedFire LubanCat 1N (RK3566, RNDIS gadget on usb_host0_xhci),
+the host sees the RNDIS device disconnect exactly 2s after boot and 6s
+after every dwc3 rebind, with clk_usbphy0_480m disabled and dwc3 ep0
+enable failing afterwards.
+
+Treat USB_DR_MODE_PERIPHERAL like HOST/UNKNOWN in
+rockchip_usb2phy_otg_port_init() (skip the OTG state machine, charger
+detection and extcon notifier registration), in
+rockchip_usb2phy_init() (do not enable bvalid/id IRQs nor schedule
+otg_sm_work) and in rockchip_usb2phy_exit() (symmetric cancellation).
+
+The PHY power state of a peripheral port then stays fully owned by the
+gadget controller through the standard phy power_on/power_off ops.
+
+Signed-off-by: syabyr <syabyr@github.com>
+---
+ drivers/phy/rockchip/phy-rockchip-inno-usb2.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+--- a/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
++++ b/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
+@@ -511,6 +511,7 @@
+ 
+ 	if (rport->port_id == USB2PHY_PORT_OTG) {
+ 		if (rport->mode != USB_DR_MODE_HOST &&
++		    rport->mode != USB_DR_MODE_PERIPHERAL &&
+ 		    rport->mode != USB_DR_MODE_UNKNOWN) {
+ 			/* clear bvalid status and enable bvalid detect irq */
+ 			ret = property_enable(rphy->grf,
+@@ -652,6 +653,7 @@
+ 
+ 	if (rport->port_id == USB2PHY_PORT_OTG &&
+ 	    rport->mode != USB_DR_MODE_HOST &&
++	    rport->mode != USB_DR_MODE_PERIPHERAL &&
+ 	    rport->mode != USB_DR_MODE_UNKNOWN) {
+ 		cancel_delayed_work_sync(&rport->otg_sm_work);
+ 		cancel_delayed_work_sync(&rport->chg_work);
+@@ -1308,7 +1310,16 @@
+ 	mutex_init(&rport->mutex);
+ 
+ 	rport->mode = of_usb_get_dr_mode_by_phy(child_np, -1);
++	/*
++	 * A peripheral-only port has no OTG role switching to manage.
++	 * Skip the OTG state machine and BC1.2 charger detection: their
++	 * opmode toggling and power_off() calls kill an active gadget
++	 * connection (e.g. RNDIS) a few seconds after enumeration on
++	 * boards whose utmi_bvalid reads erratically while the gadget
++	 * is running.
++	 */
+ 	if (rport->mode == USB_DR_MODE_HOST ||
++	    rport->mode == USB_DR_MODE_PERIPHERAL ||
+ 	    rport->mode == USB_DR_MODE_UNKNOWN) {
+ 		ret = 0;
+ 		goto out;
