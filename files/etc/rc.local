@@ -1,0 +1,4 @@
+# Start login on the HDMI framebuffer console (requires built-in DRM HDMI)
+[ -c /dev/tty1 ] && /bin/login -f root </dev/tty1 >/dev/tty1 2>&1 &
+
+exit 0

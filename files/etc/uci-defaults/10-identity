@@ -1,0 +1,21 @@
+# Board identity: hostname, timezone, dropbear banner, root shell.
+# Ported from vendor rootfs (etc/config/system + etc/passwd).
+
+uci set system.@system[0].hostname='LubanCat-1N'
+uci set system.@system[0].timezone='CST-8'
+uci set system.@system[0].zonename='Asia/Shanghai'
+uci commit system
+
+uci set dropbear.@dropbear[0].BannerFile='/etc/dropbear.banner'
+uci commit dropbear
+
+# Root shell -> bash (CONFIG_PACKAGE_bash); keep ash if bash is missing.
+if [ -x /bin/bash ]; then
+	sed -i 's|^\(root:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:\)/bin/ash$|\1/bin/bash|' /etc/passwd
+fi
+
+# git cannot store the 0600 mode of files/etc/shadow, so a fresh clone
+# would ship it world-readable; fix it here, before any service starts.
+chmod 600 /etc/shadow
+
+exit 0
