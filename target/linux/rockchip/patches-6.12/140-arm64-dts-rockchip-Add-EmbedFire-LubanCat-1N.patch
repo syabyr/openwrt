@@ -731,3 +731,8 @@ Signed-off-by: syabyr <syabyr@github.com>
 +		remote-endpoint = <&hdmi_in_vp0>;
 +	};
 +};
++
++&rknpu {
++	rknpu-supply = <&vdd_npu>;
++	status = "okay";
++};
