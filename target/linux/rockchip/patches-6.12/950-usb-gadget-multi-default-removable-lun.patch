@@ -1,0 +1,34 @@
+From: syabyr <syabyr@github.com>
+Date: Wed, 2 Sep 2026 18:00:00 +0800
+Subject: [PATCH] usb: gadget: multi: default to a removable LUN
+
+g_multi bound at boot as a built-in driver has no file= module
+parameter, so fsg_common_create_lun() rejects the empty default LUN
+with -EINVAL ("no file given for LUN0") and the whole composite
+gadget fails to bind to the UDC:
+
+    udc fcc00000.usb: failed to start g_multi: -22
+    UDC core: g_multi: couldn't find an available UDC
+
+Make the default LUN removable so the gadget binds with an empty
+(no medium) LUN, matching how g_multi is normally loaded as a module
+with removable=1.  An explicit file= parameter still overrides it.
+
+Signed-off-by: syabyr <syabyr@github.com>
+---
+ drivers/usb/gadget/legacy/multi.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+--- a/drivers/usb/gadget/legacy/multi.c
++++ b/drivers/usb/gadget/legacy/multi.c
+@@ -104,7 +104,10 @@
+ /****************************** Configurations ******************************/
+
+-static struct fsg_module_parameters fsg_mod_data = { .stall = 1 };
++static struct fsg_module_parameters fsg_mod_data = {
++	.stall = 1,
++	.removable = { [0 ... FSG_MAX_LUNS - 1] = 1 },
++};
+ #ifdef CONFIG_USB_GADGET_DEBUG_FILES
+
+ static unsigned int fsg_num_buffers = CONFIG_USB_GADGET_STORAGE_NUM_BUFFERS;

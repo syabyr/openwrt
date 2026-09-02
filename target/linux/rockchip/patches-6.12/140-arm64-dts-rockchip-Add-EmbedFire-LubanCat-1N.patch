@@ -32,7 +32,7 @@ Signed-off-by: syabyr <syabyr@github.com>
  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-evb1-v10.dtb
 --- /dev/null
 +++ b/arch/arm64/boot/dts/rockchip/rk3566-lubancat-1n.dts
-@@ -0,0 +1,692 @@
+@@ -0,0 +1,693 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +
 +/dts-v1/;
@@ -702,7 +702,8 @@ Signed-off-by: syabyr <syabyr@github.com>
 +};
 +
 +/* USB Type-C download port (fcc00000 dwc3, USB2 high-speed on RK3566):
-+ * run as USB gadget so g_ether/RNDIS presents a network adapter to a PC.
++ * run as USB gadget so g_multi (RNDIS network + CDC-ACM serial)
++ * presents a network adapter and a COM port to a PC.
 + */
 +&usb_host0_xhci {
 +	dr_mode = "peripheral";

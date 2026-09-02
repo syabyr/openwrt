@@ -1,0 +1,9 @@
+# USB gadget serial console on the Type-C download port.
+#
+# g_multi (RNDIS + CDC-ACM composite) exposes a COM port to a PC;
+# the board side is ttyGS0.  Give it a root login console so the
+# board can be accessed without the dedicated serial cable: the
+# askfirst line auto-logs-in, mirroring the tty1 HDMI console.
+grep -q '^ttyGS0' /etc/inittab || \
+	echo 'ttyGS0::askfirst:/bin/login -f root' >> /etc/inittab
+exit 0
