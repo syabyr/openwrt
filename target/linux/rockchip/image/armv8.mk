@@ -125,6 +125,7 @@ define Device/embedfire_lubancat-1n
   DEVICE_VENDOR := EmbedFire
   DEVICE_MODEL := LubanCat 1N
   DEVICE_DTS := rk3566-lubancat-1n
+  DEVICE_PACKAGES := r8169-firmware
 endef
 TARGET_DEVICES += embedfire_lubancat-1n
 
