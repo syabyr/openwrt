@@ -1,0 +1,337 @@
+--- a/drivers/pmdomain/rockchip/pm-domains.c
++++ b/drivers/pmdomain/rockchip/pm-domains.c
+@@ -19,6 +19,7 @@
+ #include <linux/of_clk.h>
+ #include <linux/clk.h>
+ #include <linux/regmap.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/mfd/syscon.h>
+ #include <soc/rockchip/pm_domains.h>
+ #include <soc/rockchip/rockchip_sip.h>
+@@ -47,6 +48,7 @@
+ 	int idle_mask;
+ 	int ack_mask;
+ 	bool active_wakeup;
++	bool need_regulator;
+ 	int pwr_w_mask;
+ 	int req_w_mask;
+ 	int clk_ungate_mask;
+@@ -95,6 +97,8 @@
+ 	u32 *qos_save_regs[MAX_QOS_REGS_NUM];
+ 	int num_clks;
+ 	struct clk_bulk_data *clks;
++	struct device_node *node;
++	struct regulator *supply;
+ };
+ 
+ struct rockchip_pmu {
+@@ -132,6 +136,20 @@
+ 	.active_wakeup = wakeup,			\
+ }
+ 
++#define DOMAIN_M_R(_name, pwr, status, req, idle, ack, wakeup, regulator)	\
++{							\
++	.name = _name,				\
++	.pwr_w_mask = (pwr) << 16,			\
++	.pwr_mask = (pwr),				\
++	.status_mask = (status),			\
++	.req_w_mask = (req) << 16,			\
++	.req_mask = (req),				\
++	.idle_mask = (idle),				\
++	.ack_mask = (ack),				\
++	.active_wakeup = wakeup,			\
++	.need_regulator = regulator,			\
++}
++
+ #define DOMAIN_M_O_R(_name, p_offset, pwr, status, m_offset, m_status, r_status, r_offset, req, idle, ack, wakeup)	\
+ {							\
+ 	.name = _name,					\
+@@ -200,8 +218,8 @@
+ #define DOMAIN_RK3528(name, pwr, req)		\
+ 	DOMAIN_M(name, pwr, pwr, req, req, req, false)
+ 
+-#define DOMAIN_RK3568(name, pwr, req, wakeup)		\
+-	DOMAIN_M(name, pwr, pwr, req, req, req, wakeup)
++#define DOMAIN_RK3568(name, pwr, req, wakeup, regulator)		\
++	DOMAIN_M_R(name, pwr, pwr, req, req, req, wakeup, regulator)
+ 
+ #define DOMAIN_RK3576(name, p_offset, pwr, status, r_status, r_offset, req, idle, g_mask, wakeup)	\
+ 	DOMAIN_M_O_R_G(name, p_offset, pwr, status, 0, r_status, r_status, r_offset, req, idle, idle, g_mask, wakeup)
+@@ -539,17 +557,18 @@
+ 	return ret;
+ }
+ 
+-static void rockchip_do_pmu_set_power_domain(struct rockchip_pm_domain *pd,
+-					     bool on)
++static int rockchip_do_pmu_set_power_domain(struct rockchip_pm_domain *pd,
++					    bool on)
+ {
+ 	struct rockchip_pmu *pmu = pd->pmu;
+ 	struct generic_pm_domain *genpd = &pd->genpd;
+ 	u32 pd_pwr_offset = pd->info->pwr_offset;
+ 	bool is_on, is_mem_on = false;
+ 	struct arm_smccc_res res;
++	int ret;
+ 
+ 	if (pd->info->pwr_mask == 0)
+-		return;
++		return 0;
+ 
+ 	if (on && pd->info->mem_status_mask)
+ 		is_mem_on = rockchip_pmu_domain_is_mem_on(pd);
+@@ -564,15 +583,18 @@
+ 
+ 	wmb();
+ 
+-	if (is_mem_on && rockchip_pmu_domain_mem_reset(pd))
+-		return;
++	if (is_mem_on) {
++		ret = rockchip_pmu_domain_mem_reset(pd);
++		if (ret)
++			return ret;
++	}
+ 
+-	if (readx_poll_timeout_atomic(rockchip_pmu_domain_is_on, pd, is_on,
+-				      is_on == on, 0, 10000)) {
+-		dev_err(pmu->dev,
+-			"failed to set domain '%s', val=%d\n",
+-			genpd->name, is_on);
+-		return;
++	ret = readx_poll_timeout_atomic(rockchip_pmu_domain_is_on, pd, is_on,
++					is_on == on, 0, 10000);
++	if (ret) {
++		dev_err(pmu->dev, "failed to set domain '%s' %s, val=%d\n",
++			genpd->name, on ? "on" : "off", is_on);
++		return ret;
+ 	}
+ 
+ 	/* Inform firmware to keep this pd on or off */
+@@ -580,6 +602,8 @@
+ 		arm_smccc_smc(ROCKCHIP_SIP_SUSPEND_MODE, ROCKCHIP_SLEEP_PD_CONFIG,
+ 				pmu->info->pwr_offset + pd_pwr_offset,
+ 				pd->info->pwr_mask, on, 0, 0, 0, &res);
++
++	return 0;
+ }
+ 
+ static int rockchip_pd_power(struct rockchip_pm_domain *pd, bool power_on)
+@@ -587,54 +611,98 @@
+ 	struct rockchip_pmu *pmu = pd->pmu;
+ 	int ret;
+ 
+-	mutex_lock(&pmu->mutex);
++	guard(mutex)(&pmu->mutex);
+ 
+-	if (rockchip_pmu_domain_is_on(pd) != power_on) {
+-		ret = clk_bulk_enable(pd->num_clks, pd->clks);
+-		if (ret < 0) {
+-			dev_err(pmu->dev, "failed to enable clocks\n");
+-			mutex_unlock(&pmu->mutex);
+-			return ret;
+-		}
++	if (rockchip_pmu_domain_is_on(pd) == power_on)
++		return 0;
+ 
+-		rockchip_pmu_ungate_clk(pd, true);
++	ret = clk_bulk_enable(pd->num_clks, pd->clks);
++	if (ret < 0) {
++		dev_err(pmu->dev, "failed to enable clocks\n");
++		return ret;
++	}
+ 
+-		if (!power_on) {
+-			rockchip_pmu_save_qos(pd);
++	rockchip_pmu_ungate_clk(pd, true);
+ 
+-			/* if powering down, idle request to NIU first */
+-			rockchip_pmu_set_idle_request(pd, true);
+-		}
++	if (!power_on) {
++		rockchip_pmu_save_qos(pd);
++
++		/* if powering down, idle request to NIU first */
++		ret = rockchip_pmu_set_idle_request(pd, true);
++		if (ret < 0)
++			goto out;
++	}
+ 
+-		rockchip_do_pmu_set_power_domain(pd, power_on);
++	ret = rockchip_do_pmu_set_power_domain(pd, power_on);
++	if (ret < 0)
++		goto out;
+ 
+-		if (power_on) {
+-			/* if powering up, leave idle mode */
+-			rockchip_pmu_set_idle_request(pd, false);
++	if (power_on) {
++		/* if powering up, leave idle mode */
++		ret = rockchip_pmu_set_idle_request(pd, false);
++		if (ret < 0)
++			goto out;
+ 
+-			rockchip_pmu_restore_qos(pd);
+-		}
++		rockchip_pmu_restore_qos(pd);
++	}
++
++out:
++	rockchip_pmu_ungate_clk(pd, false);
++	clk_bulk_disable(pd->num_clks, pd->clks);
++
++	return ret;
++}
++
++static int rockchip_pd_regulator_disable(struct rockchip_pm_domain *pd)
++{
++	return IS_ERR_OR_NULL(pd->supply) ? 0 : regulator_disable(pd->supply);
++}
++
++static int rockchip_pd_regulator_enable(struct rockchip_pm_domain *pd)
++{
++	struct rockchip_pmu *pmu = pd->pmu;
++
++	if (!pd->info->need_regulator)
++		return 0;
++
++	if (IS_ERR_OR_NULL(pd->supply)) {
++		pd->supply = devm_of_regulator_get(pmu->dev, pd->node, "domain");
+ 
+-		rockchip_pmu_ungate_clk(pd, false);
+-		clk_bulk_disable(pd->num_clks, pd->clks);
++		if (IS_ERR(pd->supply))
++			return PTR_ERR(pd->supply);
+ 	}
+ 
+-	mutex_unlock(&pmu->mutex);
+-	return 0;
++	return regulator_enable(pd->supply);
+ }
+ 
+ static int rockchip_pd_power_on(struct generic_pm_domain *domain)
+ {
+ 	struct rockchip_pm_domain *pd = to_rockchip_pd(domain);
++	int ret;
++
++	ret = rockchip_pd_regulator_enable(pd);
++	if (ret)
++		return dev_err_probe(pd->pmu->dev, ret,
++				     "Failed to enable supply: %d\n", ret);
++
++	ret = rockchip_pd_power(pd, true);
++	if (ret)
++		rockchip_pd_regulator_disable(pd);
+ 
+-	return rockchip_pd_power(pd, true);
++	return ret;
+ }
+ 
+ static int rockchip_pd_power_off(struct generic_pm_domain *domain)
+ {
+ 	struct rockchip_pm_domain *pd = to_rockchip_pd(domain);
++	int ret;
+ 
+-	return rockchip_pd_power(pd, false);
++	ret = rockchip_pd_power(pd, false);
++	if (ret)
++		return ret;
++
++	rockchip_pd_regulator_disable(pd);
++	return ret;
+ }
+ 
+ static int rockchip_pd_attach_dev(struct generic_pm_domain *genpd,
+@@ -715,6 +783,7 @@
+ 
+ 	pd->info = pd_info;
+ 	pd->pmu = pmu;
++	pd->node = node;
+ 
+ 	pd->num_clks = of_clk_get_parent_count(node);
+ 	if (pd->num_clks > 0) {
+@@ -785,6 +854,16 @@
+ 		pd->genpd.name = pd->info->name;
+ 	else
+ 		pd->genpd.name = kbasename(node->full_name);
++
++	/*
++	 * power domain's needing a regulator should default to off, since
++	 * the regulator state is unknown at probe time. Also the regulator
++	 * state cannot be checked, since that usually requires IP needing
++	 * (a different) power domain.
++	 */
++	if (pd->info->need_regulator)
++		rockchip_pd_power(pd, false);
++
+ 	pd->genpd.power_off = rockchip_pd_power_off;
+ 	pd->genpd.power_on = rockchip_pd_power_on;
+ 	pd->genpd.attach_dev = rockchip_pd_attach_dev;
+@@ -1152,15 +1231,15 @@
+ };
+ 
+ static const struct rockchip_domain_info rk3568_pm_domains[] = {
+-	[RK3568_PD_NPU]		= DOMAIN_RK3568("npu",  BIT(1), BIT(2),  false),
+-	[RK3568_PD_GPU]		= DOMAIN_RK3568("gpu",  BIT(0), BIT(1),  false),
+-	[RK3568_PD_VI]		= DOMAIN_RK3568("vi",   BIT(6), BIT(3),  false),
+-	[RK3568_PD_VO]		= DOMAIN_RK3568("vo",   BIT(7), BIT(4),  false),
+-	[RK3568_PD_RGA]		= DOMAIN_RK3568("rga",  BIT(5), BIT(5),  false),
+-	[RK3568_PD_VPU]		= DOMAIN_RK3568("vpu",  BIT(2), BIT(6),  false),
+-	[RK3568_PD_RKVDEC]	= DOMAIN_RK3568("vdec", BIT(4), BIT(8),  false),
+-	[RK3568_PD_RKVENC]	= DOMAIN_RK3568("venc", BIT(3), BIT(7),  false),
+-	[RK3568_PD_PIPE]	= DOMAIN_RK3568("pipe", BIT(8), BIT(11), false),
++	[RK3568_PD_NPU]		= DOMAIN_RK3568("npu",  BIT(1), BIT(2),  false, true),
++	[RK3568_PD_GPU]		= DOMAIN_RK3568("gpu",  BIT(0), BIT(1),  false, false),
++	[RK3568_PD_VI]		= DOMAIN_RK3568("vi",   BIT(6), BIT(3),  false, false),
++	[RK3568_PD_VO]		= DOMAIN_RK3568("vo",   BIT(7), BIT(4),  false, false),
++	[RK3568_PD_RGA]		= DOMAIN_RK3568("rga",  BIT(5), BIT(5),  false, false),
++	[RK3568_PD_VPU]		= DOMAIN_RK3568("vpu",  BIT(2), BIT(6),  false, false),
++	[RK3568_PD_RKVDEC]	= DOMAIN_RK3568("vdec", BIT(4), BIT(8),  false, false),
++	[RK3568_PD_RKVENC]	= DOMAIN_RK3568("venc", BIT(3), BIT(7),  false, false),
++	[RK3568_PD_PIPE]	= DOMAIN_RK3568("pipe", BIT(8), BIT(11), false, false),
+ };
+ 
+ static const struct rockchip_domain_info rk3576_pm_domains[] = {
+--- a/arch/arm64/boot/dts/rockchip/rk356x.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk356x.dtsi
+@@ -571,13 +571,18 @@
+ 				#power-domain-cells = <0>;
+ 			};
+ 
+-			/* These power domains are grouped by VD_NPU */
+-			power-domain@RK3568_PD_NPU {
++			/*
++			 * These power domains are grouped by VD_NPU.
++			 * The domain deliberately carries no pm_qos: qos_npu sits
++			 * behind the gated NPU NoC, so QoS save/restore on genpd
++			 * power transitions would fault on the unreachable
++			 * registers. The board supplies the rail via
++			 * domain-supply since the domain is need_regulator.
++			 */
++			pd_npu: power-domain@RK3568_PD_NPU {
+ 				reg = <RK3568_PD_NPU>;
+ 				clocks = <&cru ACLK_NPU_PRE>,
+-					 <&cru HCLK_NPU_PRE>,
+-					 <&cru PCLK_NPU_PRE>;
+-				pm_qos = <&qos_npu>;
++					 <&cru HCLK_NPU_PRE>;
+ 				#power-domain-cells = <0>;
+ 			};
+ 
+--- a/arch/arm64/boot/dts/rockchip/rk3566-lubancat-1n.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3566-lubancat-1n.dts
+@@ -315,7 +315,6 @@
+ 
+ 			vdd_npu: DCDC_REG4 {
+ 				regulator-name = "vdd_npu";
+-				regulator-always-on;
+ 				regulator-boot-on;
+ 				regulator-min-microvolt = <500000>;
+ 				regulator-max-microvolt = <1350000>;
+@@ -696,3 +695,8 @@
+ 	rknpu-supply = <&vdd_npu>;
+ 	status = "okay";
+ };
++
++/* The NPU power domain owns the vdd_npu rail (need_regulator). */
++&pd_npu {
++	domain-supply = <&vdd_npu>;
++};
