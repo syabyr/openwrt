@@ -112,7 +112,7 @@ index 54c6733..6a99729 100644
  			/* These power domains are grouped by VD_LOGIC */
  			power-domain@RK3568_PD_VI {
  				reg = <RK3568_PD_VI>;
-@@ -631,6 +641,20 @@
+@@ -631,6 +641,21 @@
  		};
  	};
  
@@ -120,6 +120,7 @@ index 54c6733..6a99729 100644
 +		compatible = "rockchip,rk3568-rknpu", "rockchip,rknpu";
 +		reg = <0x0 0xfde40000 0x0 0x10000>;
 +		interrupts = <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "npu_irq";
 +		clocks = <&cru CLK_NPU>, <&cru ACLK_NPU>, <&cru HCLK_NPU>;
 +		clock-names = "clk", "aclk", "hclk";
 +		assigned-clocks = <&cru CLK_NPU>;
@@ -351,7 +352,7 @@ new file mode 100644
 index 0000000..bf0d393
 --- /dev/null
 +++ b/drivers/rknpu/include/rknpu_devfreq.h
-@@ -0,0 +1,46 @@
+@@ -0,0 +1,51 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +/*
 + * Copyright (C) Rockchip Electronics Co., Ltd.
@@ -386,14 +387,19 @@ index 0000000..bf0d393
 +{
 +}
 +
++/*
++ * With devfreq compiled out there is nothing to do on runtime PM
++ * transitions.  Returning an error here would fail pm_runtime_get_sync()
++ * in rknpu_power_on() and abort the whole probe.
++ */
 +static inline int rknpu_devfreq_runtime_suspend(struct device *dev)
 +{
-+	return -EOPNOTSUPP;
++	return 0;
 +}
 +
 +static inline int rknpu_devfreq_runtime_resume(struct device *dev)
 +{
-+	return -EOPNOTSUPP;
++	return 0;
 +}
 +#endif /* CONFIG_PM_DEVFREQ */
 +
