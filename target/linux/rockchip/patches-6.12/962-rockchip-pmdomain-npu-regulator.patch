@@ -324,9 +324,9 @@
  				regulator-name = "vdd_npu";
 -				regulator-always-on;
  				regulator-boot-on;
- 				regulator-min-microvolt = <500000>;
- 				regulator-max-microvolt = <1350000>;
-@@ -696,3 +695,8 @@
+ 				/*
+ 				 * u-boot leaves buck4 at its 0.5 V floor and,
+@@ -706,3 +705,8 @@
  	rknpu-supply = <&vdd_npu>;
  	status = "okay";
  };
