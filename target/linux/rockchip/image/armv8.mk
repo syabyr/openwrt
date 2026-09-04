@@ -214,8 +214,9 @@ define Device/nsy_g68-plus
   DEVICE_MODEL := G68-Plus
   DEVICE_DTS := rk3568-nsy-g68-plus
   UBOOT_DEVICE_NAME := nsy-g68-plus-rk3568
-  DEVICE_PACKAGES := blkdiscard block-mount kmod-dsa-rtl8365mb \
-	kmod-mt7915e kmod-mt7916-firmware wpad-basic-mbedtls
+  DEVICE_PACKAGES := blkdiscard block-mount ethtool fdisk kmod-dsa-rtl8365mb \
+	kmod-mt7915-firmware kmod-mt7915e kmod-mt7916-firmware kmod-nvme \
+	pciutils usbutils wpad-basic-mbedtls
 endef
 TARGET_DEVICES += nsy_g68-plus
 
