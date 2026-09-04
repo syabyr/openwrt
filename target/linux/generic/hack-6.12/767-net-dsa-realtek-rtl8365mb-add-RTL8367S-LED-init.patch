@@ -1,0 +1,95 @@
+--- a/drivers/net/dsa/realtek/rtl8365mb.c
++++ b/drivers/net/dsa/realtek/rtl8365mb.c
+@@ -1892,6 +1892,77 @@
+ 	return rtl8365mb_cpu_config(priv);
+ }
+ 
++/*
++ * RTL8367S LED setup. The mainline driver performs no LED configuration at
++ * all, which leaves the LED pins inactive on boards whose vendor firmware
++ * programs them. Mimic the vendor rtl8367b driver: parallel LED operation
++ * mode, all ports in LED group 0. The per-pin function is a module parameter
++ * so it can be tuned per board (default Link/Act, see RTL8367S LED config
++ * table: 0=Off 1=Dup/Col 2=Link/Act 3=Spd1000 4=Spd100 5=Spd10
++ * 6=Spd1000/Act 7=Spd100/Act 8=Spd10/Act 9=Spd100(10)/Act 15=Act).
++ */
++#define RTL8367S_LED_CTRL_REG			0x1b00
++#define RTL8367S_LED_BLINK_RATE_REG		0x1b02
++#define RTL8367S_LED_MODE_REG			0x1b03
++#define RTL8367S_LED_GROUP0_PORTS_REG		0x1b24
++#define RTL8367S_LED_SERIAL_CFG_REG		0x1b26
++
++static unsigned int led0_cfg = 2;
++static unsigned int led1_cfg = 2;
++static unsigned int led2_cfg = 2;
++module_param(led0_cfg, uint, 0644);
++MODULE_PARM_DESC(led0_cfg, "RTL8367S LED0 config (default 2 = Link/Act)");
++module_param(led1_cfg, uint, 0644);
++MODULE_PARM_DESC(led1_cfg, "RTL8367S LED1 config (default 2 = Link/Act)");
++module_param(led2_cfg, uint, 0644);
++MODULE_PARM_DESC(led2_cfg, "RTL8367S LED2 config (default 2 = Link/Act)");
++
++static int rtl8365mb_led_setup(struct realtek_priv *priv)
++{
++	unsigned int cfgs[3] = { led0_cfg, led1_cfg, led2_cfg };
++	int ret;
++	int i;
++
++	/* Assign all ports to LED group 0 */
++	ret = regmap_update_bits(priv->map, RTL8367S_LED_GROUP0_PORTS_REG,
++				 GENMASK(7, 0), GENMASK(7, 0));
++	if (ret)
++		return ret;
++
++	/* Select LED mode 0 */
++	ret = regmap_update_bits(priv->map, RTL8367S_LED_MODE_REG,
++				 GENMASK(13, 12) | BIT(14), BIT(14));
++	if (ret)
++		return ret;
++
++	/* Parallel LED operation mode, disable serial mode */
++	ret = regmap_update_bits(priv->map, RTL8367S_LED_CTRL_REG, BIT(0), 0);
++	if (ret)
++		return ret;
++
++	ret = regmap_update_bits(priv->map, RTL8367S_LED_SERIAL_CFG_REG,
++				 GENMASK(1, 0), 0);
++	if (ret)
++		return ret;
++
++	/* LED blink rate: 84 ms */
++	ret = regmap_update_bits(priv->map, RTL8367S_LED_BLINK_RATE_REG,
++				 0x7 << 1, 1 << 1);
++	if (ret)
++		return ret;
++
++	/* Program the per-pin LED function */
++	for (i = 0; i < 3; i++) {
++		ret = regmap_update_bits(priv->map, RTL8367S_LED_MODE_REG,
++					 0xf << (i * 4) | BIT(14),
++					 cfgs[i] << (i * 4));
++		if (ret)
++			return ret;
++	}
++
++	return 0;
++}
++
+ static int rtl8365mb_switch_init(struct realtek_priv *priv)
+ {
+ 	struct rtl8365mb *mb = priv->chip_data;
+@@ -1963,6 +2034,14 @@
+ 		goto out_error;
+ 	}
+ 
++	/* Program LED mode on RTL8367S (parallel, all ports in group 0) */
++	if (mb->chip_info->chip_id == 0x6367 &&
++	    mb->chip_info->chip_ver == 0x00A0) {
++		ret = rtl8365mb_led_setup(priv);
++		if (ret)
++			dev_warn(priv->dev, "failed to set up LEDs: %d\n", ret);
++	}
++
+ 	/* Set up cascading IRQs */
+ 	ret = rtl8365mb_irq_setup(priv);
+ 	if (ret == -EPROBE_DEFER)
