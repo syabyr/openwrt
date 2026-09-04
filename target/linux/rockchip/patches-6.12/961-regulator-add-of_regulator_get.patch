@@ -1,0 +1,111 @@
+--- a/drivers/regulator/of_regulator.c
++++ b/drivers/regulator/of_regulator.c
+@@ -677,6 +677,50 @@
+ 	return ERR_PTR(-ENODEV);
+ }
+ 
++/**
++ * of_regulator_get - get regulator via device tree lookup
++ * @dev: device used for dev_printk() messages
++ * @node: device node for regulator "consumer"
++ * @id: Supply name
++ *
++ * Return: pointer to struct regulator corresponding to the regulator producer,
++ *	   or PTR_ERR() encoded error number.
++ *
++ * This is intended for use by consumers that want to get a regulator
++ * supply directly from a device node. This will _not_ consider supply
++ * aliases. See regulator_dev_lookup().
++ */
++struct regulator *of_regulator_get(struct device *dev,
++				  struct device_node *node, const char *id)
++{
++	struct regulator_dev *r;
++	struct device_node *regnode;
++	char prop_name[64]; /* 64 is max size of property name */
++	int ret;
++
++	ret = _regulator_get_common_check(dev, id, NORMAL_GET);
++	if (ret)
++		return ERR_PTR(ret);
++
++	snprintf(prop_name, sizeof(prop_name), "%s-supply", id);
++	regnode = of_parse_phandle(node, prop_name, 0);
++	if (!regnode)
++		return ERR_PTR(-ENODEV);
++
++	r = of_find_regulator_by_node(regnode);
++	of_node_put(regnode);
++	if (!r) {
++		/*
++		 * We have a node, but there is no device.
++		 * assume it has not registered yet.
++		 */
++		return ERR_PTR(-EPROBE_DEFER);
++	}
++
++	return _regulator_get_common(r, dev, id, NORMAL_GET);
++}
++EXPORT_SYMBOL_GPL(of_regulator_get);
++
+ /*
+  * Returns number of regulators coupled with rdev.
+  */
+--- a/drivers/regulator/devres.c
++++ b/drivers/regulator/devres.c
+@@ -749,3 +749,37 @@
+ 	return ptr;
+ }
+ EXPORT_SYMBOL_GPL(devm_regulator_irq_helper);
++
++#if IS_ENABLED(CONFIG_OF)
++/**
++ * devm_of_regulator_get - Resource managed of_regulator_get()
++ * @dev: device used for dev_printk() messages and resource lifetime management
++ * @node: device node for regulator "consumer"
++ * @id:  supply name or regulator ID.
++ *
++ * Managed of_regulator_get(). Regulators returned from this
++ * function are automatically regulator_put() on driver detach. See
++ * of_regulator_get() for more information.
++ */
++struct regulator *devm_of_regulator_get(struct device *dev,
++					struct device_node *node,
++					const char *id)
++{
++	struct regulator **ptr, *regulator;
++
++	ptr = devres_alloc(devm_regulator_release, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return ERR_PTR(-ENOMEM);
++
++	regulator = of_regulator_get(dev, node, id);
++	if (!IS_ERR(regulator)) {
++		*ptr = regulator;
++		devres_add(dev, ptr);
++	} else {
++		devres_free(ptr);
++	}
++
++	return regulator;
++}
++EXPORT_SYMBOL_GPL(devm_of_regulator_get);
++#endif /* IS_ENABLED(CONFIG_OF) */
+--- a/include/linux/regulator/consumer.h
++++ b/include/linux/regulator/consumer.h
+@@ -168,6 +168,15 @@
+ void regulator_put(struct regulator *regulator);
+ void devm_regulator_put(struct regulator *regulator);
+ 
++#if defined(CONFIG_OF)
++struct regulator *__must_check of_regulator_get(struct device *dev,
++						struct device_node *node,
++						const char *id);
++struct regulator *__must_check devm_of_regulator_get(struct device *dev,
++						     struct device_node *node,
++						     const char *id);
++#endif /* CONFIG_OF */
++
+ int regulator_register_supply_alias(struct device *dev, const char *id,
+ 				    struct device *alias_dev,
+ 				    const char *alias_id);
