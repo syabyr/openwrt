@@ -31,6 +31,10 @@ The device tree side adds the npu@fde40000 node to rk356x.dtsi with
 CRU clock/reset/power-domain references (status disabled; boards
 enable it explicitly).  Compared to the vendor node it drops the
 SCMI clock, the IOMMU reference and the vendor OPP table.
+Also add a 900 MHz entry to the rk3568 PLL rate table: the NPU node
+asks for a 900 MHz NPLL rate via assigned-clocks, but the stock table
+jumps from 912 to 816 MHz so the request rounds down to 816 MHz.
+900 MHz is 24 MHz * 75 / 2, same structure as the neighbouring entries.
 
 It also adds the missing power-domain@RK3568_PD_NPU child to the
 rk356x power-controller: the mainline rockchip pm-domains driver
@@ -41,6 +45,7 @@ would defer forever and fail with -ETIMEDOUT.
 Signed-off-by: syabyr <syabyr@github.com>
 ---
  arch/arm64/boot/dts/rockchip/rk356x.dtsi |   24 +
+ drivers/clk/rockchip/clk-rk3568.c     |    1 +
  drivers/Kconfig                          |    2 +
  drivers/Makefile                         |    1 +
  drivers/rknpu/Kconfig                    |   69 +
@@ -112,7 +117,7 @@ index 54c6733..6a99729 100644
  			/* These power domains are grouped by VD_LOGIC */
  			power-domain@RK3568_PD_VI {
  				reg = <RK3568_PD_VI>;
-@@ -631,6 +641,21 @@
+@@ -631,6 +641,27 @@
  		};
  	};
  
@@ -123,8 +128,14 @@ index 54c6733..6a99729 100644
 +		interrupt-names = "npu_irq";
 +		clocks = <&cru CLK_NPU>, <&cru ACLK_NPU>, <&cru HCLK_NPU>;
 +		clock-names = "clk", "aclk", "hclk";
-+		assigned-clocks = <&cru CLK_NPU>;
-+		assigned-clock-rates = <600000000>;
++		/*
++		 * CLK_NPU_SRC is a mux/div composite without
++		 * CLK_SET_RATE_PARENT, so a rate request can only pick
++		 * from existing parent PLL rates (and rounds down).  Program
++		 * NPLL first, then the source picks it up for an exact rate.
++		 */
++		assigned-clocks = <&cru PLL_NPLL>, <&cru CLK_NPU>;
++		assigned-clock-rates = <900000000 900000000>;
 +		resets = <&cru SRST_A_NPU>, <&cru SRST_H_NPU>;
 +		reset-names = "srst_a", "srst_h";
 +		power-domains = <&power RK3568_PD_NPU>;
@@ -8979,4 +8990,12 @@ index 0000000..6514236
 +}
 -- 
 2.43.0
-
+--- a/drivers/clk/rockchip/clk-rk3568.c
++++ b/drivers/clk/rockchip/clk-rk3568.c
+@@ -62,6 +62,7 @@
+ 	RK3036_PLL_RATE(1000000000, 3, 250, 2, 1, 1, 0),
+ 	RK3036_PLL_RATE(912000000, 1, 76, 2, 1, 1, 0),
++	RK3036_PLL_RATE(900000000, 1, 75, 2, 1, 1, 0),
+ 	RK3036_PLL_RATE(816000000, 1, 68, 2, 1, 1, 0),
+ 	RK3036_PLL_RATE(800000000, 3, 200, 2, 1, 1, 0),
+ 	RK3036_PLL_RATE(724000000, 3, 181, 2, 1, 1, 0),
