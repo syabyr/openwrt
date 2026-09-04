@@ -10,7 +10,7 @@
  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-radxa-e25.dtb
 --- /dev/null
 +++ b/arch/arm64/boot/dts/rockchip/rk3568-nsy-g68-plus.dts
-@@ -0,0 +1,543 @@
+@@ -0,0 +1,578 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +/*
 + * Device tree for the NSY-G68-Plus (NSY-G68 AX3000) router.
@@ -173,7 +173,7 @@
 +		regulator-name = "vdd_npu";
 +		regulator-min-microvolt = <500000>;
 +		regulator-max-microvolt = <1350000>;
-+		regulator-init-microvolt = <1000000>;
++		regulator-init-microvolt = <975000>;
 +		regulator-settling-time-up-us = <250>;
 +		regulator-enable-ramp-delay = <300>;
 +		regulator-ramp-delay = <8000>;
@@ -218,6 +218,40 @@
 +		regulator-min-microvolt = <3300000>;
 +		regulator-max-microvolt = <3300000>;
 +		vin-supply = <&vcc3v3_sys>;
++	};
++
++	npu_opp_table: npu-opp-table {
++		compatible = "operating-points-v2";
++
++		opp-300000000 {
++			opp-hz = /bits/ 64 <300000000>;
++			opp-microvolt = <850000>;
++		};
++
++		opp-400000000 {
++			opp-hz = /bits/ 64 <400000000>;
++			opp-microvolt = <850000>;
++		};
++
++		opp-600000000 {
++			opp-hz = /bits/ 64 <600000000>;
++			opp-microvolt = <850000>;
++		};
++
++		opp-700000000 {
++			opp-hz = /bits/ 64 <700000000>;
++			opp-microvolt = <850000>;
++		};
++
++		opp-800000000 {
++			opp-hz = /bits/ 64 <800000000>;
++			opp-microvolt = <925000>;
++		};
++
++		opp-900000000 {
++			opp-hz = /bits/ 64 <900000000>;
++			opp-microvolt = <975000>;
++		};
 +	};
 +
 +	adc-keys {
@@ -551,6 +585,7 @@
 +};
 +
 +&rknpu {
++	operating-points-v2 = <&npu_opp_table>;
 +	rknpu-supply = <&vdd_npu>;
 +	status = "okay";
 +};
