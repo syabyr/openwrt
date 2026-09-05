@@ -10,7 +10,7 @@
  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-radxa-e25.dtb
 --- /dev/null
 +++ b/arch/arm64/boot/dts/rockchip/rk3568-nsy-g68-plus.dts
-@@ -0,0 +1,578 @@
+@@ -0,0 +1,595 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +/*
 + * Device tree for the NSY-G68-Plus (NSY-G68 AX3000) router.
@@ -536,6 +536,23 @@
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&emmc_bus8 &emmc_clk &emmc_cmd &emmc_datastrobe>;
 +	status = "okay";
++};
++
++
++/*
++ * No dedicated NPU temperature sensor exists on RK3568; tsadc is
++ * 2-channel (cpu/gpu).  Cap the NPU frequency from the cpu-thermal
++ * zone (same package) using the 75C trip that otherwise has no
++ * cooling device attached, while cpufreq owns the 70C trip below.
++ */
++&cpu_thermal {
++	cooling-maps {
++		map-npu {
++			trip = <&cpu_alert1>;
++			cooling-device =
++				<&rknpu THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++		};
++	};
 +};
 +
 +
