@@ -36,6 +36,14 @@ define U-Boot/mx6cuboxi
   BUILD_DEVICES:=solidrun_cubox-i
 endef
 
+define U-Boot/marsboard
+  NAME:=Embest MarS Board
+  UBOOT_IMAGE:=u-boot-dtb.imx
+  UBOOT_MAKE_FLAGS+=u-boot-dtb.imx
+  BUILD_SUBTARGET:=cortexa9
+  BUILD_DEVICES:=embest_marsboard
+endef
+
 define U-Boot/pico-pi-imx7d
   NAME:=TechNexion PICO-PI-IMX7D
   UBOOT_IMAGE:=SPL u-boot-dtb.img
@@ -53,6 +61,7 @@ endef
 UBOOT_TARGETS := \
 	apalis_imx6 \
 	mx6cuboxi \
+	marsboard \
 	pico-pi-imx7d \
 	wandboard
 

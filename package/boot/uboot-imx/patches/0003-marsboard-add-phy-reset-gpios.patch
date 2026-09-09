@@ -1,0 +1,17 @@
+--- a/arch/arm/dts/imx6q-marsboard-u-boot.dtsi
++++ b/arch/arm/dts/imx6q-marsboard-u-boot.dtsi
+@@ -6,3 +6,14 @@
+ 		mmc1 = &usdhc3;
+ 	};
+ };
++
++/* The AR8035 PHY needs its RGMII_nRST line (GPIO3_31) toggled before it
++ * answers on MDIO.  U-Boot's fec driver does not understand the
++ * reset-gpios property on the PHY node that the mainline kernel DTS
++ * uses, so mirror it with the legacy phy-reset-gpios binding here.
++ */
++&fec {
++	phy-reset-gpios = <&gpio3 31 GPIO_ACTIVE_LOW>;
++	phy-reset-duration = <10>;
++	phy-reset-post-delay = <2>;
++};

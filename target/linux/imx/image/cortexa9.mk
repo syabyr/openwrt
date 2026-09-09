@@ -76,6 +76,17 @@ define Build/ventana-img
 	$(Build/imx-combined-image-clean)
 endef
 
+# Boot image for boards with a single (non-SPL) u-boot-dtb.imx: the i.MX6 ROM
+# expects the image at 1KiB offset of the SD card / eMMC.
+define Build/imx-sdcard-bootimx
+	$(Build/imx-combined-image-prepare)
+
+	$(Build/imx-combined-image)
+	dd if=$(STAGING_DIR_IMAGE)/$(UBOOT)-u-boot-dtb.imx of=$@ bs=1024 seek=1 conv=notrunc
+
+	$(Build/imx-combined-image-clean)
+endef
+
 define Device/Default
   PROFILES := Default
   FILESYSTEMS := squashfs ext4
@@ -193,3 +204,17 @@ define Device/wandboard_dual
   DEVICE_DTS := imx6dl-wandboard
 endef
 TARGET_DEVICES += wandboard_dual
+
+define Device/embest_marsboard
+  DEVICE_VENDOR := Embest
+  DEVICE_MODEL := MarS Board
+  DEVICE_DTS := imx6q-marsboard
+  DEVICE_PACKAGES := kmod-leds-gpio
+  UBOOT := marsboard
+  KERNEL := kernel-bin
+  KERNEL_SUFFIX := -zImage
+  IMAGES := combined.bin dtb
+  IMAGE/combined.bin := append-rootfs | pad-extra 128k | imx-sdcard-bootimx
+  IMAGE/dtb := install-dtb
+endef
+TARGET_DEVICES += embest_marsboard

@@ -1,0 +1,24 @@
+--- a/board/embest/mx6boards/mx6boards.c
++++ b/board/embest/mx6boards/mx6boards.c
+@@ -99,12 +99,19 @@
+ 
+ static void setup_iomux_enet(void)
+ {
++	struct gpio_desc phy_rst;
++
+ 	imx_iomux_v3_setup_multiple_pads(enet_pads, ARRAY_SIZE(enet_pads));
+ 
+ 	/* Reset AR8035 PHY */
+-	gpio_direction_output(IMX_GPIO_NR(3, 31) , 0);
++	if (dm_gpio_lookup_name("GPIO3_31", &phy_rst))
++		return;
++	if (dm_gpio_request(&phy_rst, "phy-reset"))
++		return;
++	dm_gpio_set_dir_flags(&phy_rst, GPIOD_IS_OUT);
+ 	mdelay(2);
+-	gpio_set_value(IMX_GPIO_NR(3, 31), 1);
++	dm_gpio_set_value(&phy_rst, 1);
++	dm_gpio_free(phy_rst.dev, &phy_rst);
+ }
+ 
+ int mx6_rgmii_rework(struct phy_device *phydev)
