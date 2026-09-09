@@ -1,0 +1,37 @@
+From: OpenWrt community
+Subject: [PATCH] ARM: dts: imx6q-marsboard: configure the AR8035 PHY
+
+The MarS Board never passed Ethernet traffic: the link came up but no
+frame crossed the PHY, in U-Boot and in Linux alike. The U-Boot side
+fixup (ported from the vendor BSP and the known-good SolidRun microSOM
+configuration for the same PHY) proved that programming the PHY fixes
+it. Since the PHY node carries reset-gpios, Linux resets the PHY at
+probe time and all register programming done by the bootloader is lost,
+so the kernel has to redo it through the at803x driver DT properties:
+
+- qca,clk-out-frequency: the CLK_25M pin is wired to the ENET_REF_CLK
+  pad; program it to 125 MHz.
+- qca,disable-smarteee: keep SmartEEE off, matching the U-Boot fixup
+  (SmartEEE caused link glitches on AR803x).
+
+The RGMII rx/tx delays for phy-mode = "rgmii-id" are applied by the
+at803x driver itself, so they need no DT property.
+
+--- a/arch/arm/boot/dts/nxp/imx/imx6q-marsboard.dts	2026-09-09 00:10:40.898970118 +0800
++++ b/arch/arm/boot/dts/nxp/imx/imx6q-marsboard.dts	2026-09-09 00:10:40.899420516 +0800
+@@ -121,6 +121,15 @@
+ 		/* Atheros AR8035 PHY */
+ 		rgmii_phy: ethernet-phy@4 {
+ 			reg = <4>;
++			/*
++			 * CLK_25M feeds the ENET_REF_CLK pad; program it to
++			 * 125 MHz and keep SmartEEE off, like the working
++			 * U-Boot fixup for this board. The RGMII delays for
++			 * phy-mode = "rgmii-id" are applied by the at803x
++			 * driver itself.
++			 */
++			qca,clk-out-frequency = <125000000>;
++			qca,disable-smarteee;
+ 			interrupts-extended = <&gpio1 28 IRQ_TYPE_LEVEL_LOW>;
+ 			reset-gpios = <&gpio3 31 GPIO_ACTIVE_LOW>;
+ 			reset-assert-us = <10000>;

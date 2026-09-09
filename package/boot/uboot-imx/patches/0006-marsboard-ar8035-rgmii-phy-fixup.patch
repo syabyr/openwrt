@@ -1,0 +1,83 @@
+From: OpenWrt community
+Subject: [PATCH] embest: mx6boards: full AR8035 RGMII fixup for MarS Board/RIoTboard
+
+The MarS Board and RIoTboard connect an AR8035 PHY via RGMII. The board
+never passed traffic: link comes up but no frame crosses the PHY, in
+U-Boot and in Linux alike. Align the U-Boot side PHY fixup with the
+known-good Linux configuration used for the same PHY on the SolidRun
+microSOM (imx6qdl-sr-som.dtsi) and the vendor BSP:
+
+- Fix the SmartEEE disable: it is bit 8 of MMD3 register 0x805d, and the
+  old three-write sequence never selected MMD3 nor stored a value, so it
+  disabled nothing.
+- Program CLK_25M to output 125 MHz (bits [4:3] of MMD7 register 0x8016),
+  the u-boot equivalent of the "qca,clk-out-frequency" DT property. The
+  CLK_25M pin is wired to the ENET_REF_CLK pad on these boards.
+- Set the RGMII delays to match phy-mode = "rgmii-id": rx data delay
+  (debug register 0x00 bit 15), tx clock delay (debug register 0x05
+  bit 8) and gtx clock delay (debug register 0x0b bits [6:5] = 01) as
+  done by the vendor BSP (the Linux at803x driver does not touch the
+  gtx delay value).
+
+--- a/board/embest/mx6boards/mx6boards.c	2026-09-08 23:58:40.507810108 +0800
++++ b/board/embest/mx6boards/mx6boards.c	2026-09-08 23:58:40.506284954 +0800
+@@ -147,13 +147,56 @@
+ 
+ int mx6_rgmii_rework(struct phy_device *phydev)
+ {
+-	/* from linux/arch/arm/mach-imx/mach-imx6q.c :
++	u16 val;
++
++	/*
+ 	 * Ar803x phy SmartEEE feature cause link status generates glitch,
+-	 * which cause ethernet link down/up issue, so disable SmartEEE
++	 * which cause ethernet link down/up issue, so disable SmartEEE.
++	 * SmartEEE is controlled by bit 8 of MMD3 register 0x805d. The
++	 * three-write sequence that was here before never selected MMD3
++	 * and never stored a value, so it disabled nothing.
+ 	 */
+-	phy_write(phydev, MDIO_DEVAD_NONE, 0xd, 0x7);
++	phy_write(phydev, MDIO_DEVAD_NONE, 0xd, 0x3);
+ 	phy_write(phydev, MDIO_DEVAD_NONE, 0xe, 0x805d);
+ 	phy_write(phydev, MDIO_DEVAD_NONE, 0xd, 0x4003);
++	val = phy_read(phydev, MDIO_DEVAD_NONE, 0xe);
++	val &= ~0x0100;
++	phy_write(phydev, MDIO_DEVAD_NONE, 0xe, val);
++
++	/*
++	 * The AR8035 on the MarS Board/RIoTboard feeds its CLK_25M output
++	 * back to the ENET_REF_CLK pad. Program it to 125 MHz like the
++	 * "qca,clk-out-frequency" DT property does in Linux for the same
++	 * PHY on the SolidRun microSOM (bits [4:3] of MMD7 reg 0x8016).
++	 */
++	phy_write(phydev, MDIO_DEVAD_NONE, 0xd, 0x7);
++	phy_write(phydev, MDIO_DEVAD_NONE, 0xe, 0x8016);
++	phy_write(phydev, MDIO_DEVAD_NONE, 0xd, 0x4007);
++	val = phy_read(phydev, MDIO_DEVAD_NONE, 0xe);
++	val &= ~0x18;
++	val |= 0x18;
++	phy_write(phydev, MDIO_DEVAD_NONE, 0xe, val);
++
++	/*
++	 * RGMII delays, matching phy-mode = "rgmii-id" in the device tree:
++	 * rx data delay (debug reg 0x00 bit 15), tx clock delay (debug reg
++	 * 0x05 bit 8) and gtx clock delay (debug reg 0x0b bits [6:5] = 01).
++	 */
++	phy_write(phydev, MDIO_DEVAD_NONE, 0x1d, 0x0);
++	val = phy_read(phydev, MDIO_DEVAD_NONE, 0x1e);
++	val |= 0x8000;
++	phy_write(phydev, MDIO_DEVAD_NONE, 0x1e, val);
++
++	phy_write(phydev, MDIO_DEVAD_NONE, 0x1d, 0x5);
++	val = phy_read(phydev, MDIO_DEVAD_NONE, 0x1e);
++	val |= 0x0100;
++	phy_write(phydev, MDIO_DEVAD_NONE, 0x1e, val);
++
++	phy_write(phydev, MDIO_DEVAD_NONE, 0x1d, 0xb);
++	val = phy_read(phydev, MDIO_DEVAD_NONE, 0x1e);
++	val &= ~0x60;
++	val |= 0x20;
++	phy_write(phydev, MDIO_DEVAD_NONE, 0x1e, val);
+ 
+ 	return 0;
+ }

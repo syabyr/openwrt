@@ -1,0 +1,73 @@
+From: OpenWrt community
+Subject: [PATCH] embest: mx6boards: enable the FEC clocks for the AR8035 PHY
+
+The MarS Board and the RIoTboard use an AR8035 PHY connected via RGMII.
+Two clock setups have to be in place before the fec driver can talk to
+the PHY:
+
+1. The ENET peripheral clock gate (CCM CCGR1). This U-Boot builds
+   neither with SPL nor with CONFIG_CLK_CCF, so nothing ever enables
+   it: the DCD only initializes the DDR and the fec driver handles
+   its clocks only on the CCF/IMX8 code paths. With the gate closed
+   the FEC registers (including the MDIO engine) are dead,
+   phy_connect() fails during probe and U-Boot reports "No ethernet
+   found" / "No MDIO bus found" even with the PHY reset line properly
+   toggled. The vendor U-Boot does not show this problem because its
+   lowlevel init sets all CCGR registers to 0xffffffff.
+
+2. The ENET reference clock: enable the ANATOP ENET PLL and select it
+   via IOMUXC GPR1[ENET_CLK_SEL], like board/solidrun/mx6cuboxi does
+   for the same PHY family. (The PHY on these boards carries its own
+   25 MHz crystal, so this mainly matches the known-good reference
+   configuration the kernel uses.)
+
+Do both from board_init(). RIoTboard benefits from this as well.
+
+--- a/board/embest/mx6boards/mx6boards.c
++++ b/board/embest/mx6boards/mx6boards.c
+@@ -114,6 +114,37 @@
+ 	dm_gpio_free(phy_rst.dev, &phy_rst);
+ }
+ 
++static int setup_fec(void)
++{
++	struct iomuxc *const iomuxc_regs = (struct iomuxc *)IOMUXC_BASE_ADDR;
++	int ret;
++
++	/*
++	 * Open the ENET peripheral clock gate. This is neither an SPL nor
++	 * a CONFIG_CLK_CCF build, so nothing else ever enables it: the DCD
++	 * only initializes the DDR and the fec driver handles its clocks
++	 * only on CCF/IMX8 builds. With the gate closed the FEC registers
++	 * (including the MDIO engine) are dead.
++	 */
++	enable_enet_clk(1);
++
++	/*
++	 * Enable the ANATOP ENET PLL and route it to the ENET reference
++	 * clock, like the kernel and board/solidrun/mx6cuboxi do for the
++	 * same PHY family. (The PHY on these boards carries its own
++	 * 25 MHz crystal, so this mainly matches the known-good
++	 * reference configuration.)
++	 */
++	ret = enable_fec_anatop_clock(0, ENET_25MHZ);
++	if (ret)
++		return ret;
++
++	/* set gpr1[ENET_CLK_SEL] */
++	setbits_le32(&iomuxc_regs->gpr[1], IOMUXC_GPR1_ENET_CLK_SEL_MASK);
++
++	return 0;
++}
++
+ int mx6_rgmii_rework(struct phy_device *phydev)
+ {
+ 	/* from linux/arch/arm/mach-imx/mach-imx6q.c :
+@@ -417,6 +448,7 @@
+ #ifdef CONFIG_MXC_SPI
+ 	setup_spi();
+ #endif
++	setup_fec();
+ 	return 0;
+ }
+ 
