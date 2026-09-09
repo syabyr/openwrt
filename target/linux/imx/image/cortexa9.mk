@@ -209,7 +209,7 @@ define Device/embest_marsboard
   DEVICE_VENDOR := Embest
   DEVICE_MODEL := MarS Board
   DEVICE_DTS := imx6q-marsboard
-  DEVICE_PACKAGES := kmod-leds-gpio
+  DEVICE_PACKAGES := kmod-leds-gpio kmod-usb-gadget-cdc-composite
   UBOOT := marsboard
   KERNEL := kernel-bin
   KERNEL_SUFFIX := -zImage
