@@ -1,0 +1,6 @@
+# Disable dnsmasq DNS rebind protection: bench LAN names resolve to
+# private addresses and must be answered for LAN clients.
+uci set dhcp.@dnsmasq[0].rebind_protection='0'
+uci commit dhcp
+
+exit 0
