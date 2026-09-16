@@ -1,0 +1,34 @@
+#!/bin/sh /etc/rc.common
+START=95
+STOP=10
+
+SERVICE_NAME="bs_agent"
+WORKDIR="/usr/lib/python3.13/site-packages/bs_agent"          # <== 这里按你在 OpenWrt 上的实际路径改
+PYTHON="/usr/bin/python3"         # 或用 venv 路径
+PORT=5901
+
+start() {
+    echo "Starting $SERVICE_NAME..."
+    cd "$WORKDIR" || exit 1
+    # 设置 PATH / VIRTUAL_ENV 等环境
+    export PATH="/usr/bin:/usr/sbin:/usr/local/bin:$PATH"
+    # 后台运行，自己管理 pidfile
+    mkdir -p /var/log/bs_agent
+    $PYTHON /usr/lib/python3.13/site-packages/bs_agent/run.py >/var/log/bs_agent/bs_agent.log 2>&1 &
+    echo $! >/var/run/bs_agent.pid
+}
+
+stop() {
+    echo "Stopping $SERVICE_NAME..."
+    if [ -f /var/run/bs_agent.pid ]; then
+        PID=$(cat /var/run/bs_agent.pid)
+        kill -9 "$PID" 2>/dev/null || true
+        rm -f /var/run/bs_agent.pid
+    fi
+}
+
+restart() {
+    stop
+    sleep 1
+    start
+}
