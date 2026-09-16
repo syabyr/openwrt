@@ -1,0 +1,34 @@
+# bsagent map-IP guard -- prepended to fw4's input_wan chain (priority before
+# the ssh/web/bs_agent ACCEPTs) by the fw4 auto-include of
+# /usr/share/nftables.d/chain-pre/<chain>/*.nft.
+#
+# Purpose: a configured bench Map IP (e.g. 10.0.96.169, a secondary IP on the
+# wan interface) must NOT double as a router-management endpoint for arbitrary
+# sources. The bench DNAT itself is already gated by the redirect's
+# `option ipset allowed_bench_clients`, but a NON-allowlisted source can still
+# reach the router's own sshd/uhttpd/bs_agent through the Map IP (the service
+# ACCEPTs in input_wan are not destination-aware). This rule closes that gap:
+# any ingress destined to a Map IP whose source is NOT in the allowlist is
+# dropped, before those service ACCEPTs fire.
+#
+# Why input_wan and not the bench forward path: a DNAT'd flow has its daddr
+# rewritten to the bench (192.168.1.x) in prerouting and is then FORWARDED --
+# it never enters input_wan, so this rule cannot affect bench traffic. Only
+# traffic that terminates on the router under a Map IP reaches here.
+#
+# @bench_map_ips   -- the set of live Map IPs (the src_dip of every enabled
+#                     owned redirect). Its DEFINITION is always present via
+#                     the table-pre include 30-bsagent-map-guard-set.nft, so
+#                     this reference always resolves -- even before the
+#                     uci-defaults migration runs (fail-safe: a missing config
+#                     ipset section leaves the set EMPTY, not unresolved, so
+#                     fw4 reload/restart never breaks). Its ENTRIES are seeded
+#                     by the migration and kept current by benches.js
+#                     syncMapIps().
+# @allowed_bench_clients -- fw4 ipset; the client allowlist (same set the
+#                     redirect DNAT gates on).
+# Negated membership: ip saddr != @allowed_bench_clients. If the allowlist is
+# empty, this is true for all sources (every Map IP is fully blocked); if it
+# contains 0.0.0.0/0, it is false for all (the guard is a no-op). Exactly the
+# complement of the redirect's `ip saddr @allowed_bench_clients` gate.
+ip daddr @bench_map_ips ip saddr != @allowed_bench_clients counter drop comment "!bsagent: drop non-allowlisted ingress to map IP"

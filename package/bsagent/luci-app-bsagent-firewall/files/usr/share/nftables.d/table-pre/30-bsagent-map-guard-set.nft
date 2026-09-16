@@ -1,0 +1,30 @@
+# bsagent map-IP guard set -- the DEFINITION of @bench_map_ips.
+#
+# Auto-included by fw4 at table level into `table inet fw4` (one of fw4's
+# standard table-pre auto-include slots) on EVERY firewall load. Being a
+# package file, it is present the moment the app is installed -- no reboot,
+# no uci-defaults migration run required -- so @bench_map_ips always resolves.
+#
+# This makes the chain-pre input_wan guard (30-bsagent-map-guard.nft) fail-SAFE.
+# The companion `config ipset bench_map_ips` section (family ipv4, match net)
+# supplies the dynamic ENTRIES -- the live Map IPs -- which fw4 renders into
+# this set. It is created + seeded by the uci-defaults migration and kept
+# current by benches.js syncMapIps(). If that section is ABSENT (a fresh
+# install before the one-shot migration has run, or it was removed), the set
+# still exists here as an EMPTY set, the guard simply matches nothing (no-op),
+# and `fw4 reload` / `/etc/init.d/firewall restart` keep working.
+#
+# Without this file, a missing section left @bench_map_ips unresolved and
+# BRICKED the whole firewall restart (fail-deadly) -- observed on a device
+# where an apk-installed r6 had not yet rebooted, so the uci-defaults migration
+# never ran and the config ipset section was never created.
+#
+# When both this file and the config ipset define the set, nft merges them:
+# the config-driven block carries the elements, this one is a structural
+# no-op. Verified: `fw4 restart` succeeds and the set retains its entries
+# (e.g. elements = { 10.0.96.169 }).
+set bench_map_ips {
+	type ipv4_addr
+	auto-merge
+	flags interval
+}
