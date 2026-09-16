@@ -1,0 +1,23 @@
+# Pre-provision WAN ingress rules: ssh (22), LuCI web (80), bs_agent (5901).
+uci set firewall.wan_ssh=rule
+uci set firewall.wan_ssh.src='wan'
+uci set firewall.wan_ssh.name='ssh'
+uci set firewall.wan_ssh.dest_port='22'
+uci set firewall.wan_ssh.target='ACCEPT'
+uci set firewall.wan_ssh.proto='tcp'
+
+uci set firewall.wan_web=rule
+uci set firewall.wan_web.src='wan'
+uci set firewall.wan_web.name='web'
+uci set firewall.wan_web.dest_port='80'
+uci set firewall.wan_web.target='ACCEPT'
+
+uci set firewall.wan_bs_agent=rule
+uci set firewall.wan_bs_agent.src='wan'
+uci set firewall.wan_bs_agent.name='bs_agent'
+uci set firewall.wan_bs_agent.dest_port='5901'
+uci set firewall.wan_bs_agent.target='ACCEPT'
+
+uci commit firewall
+
+exit 0
