@@ -1,0 +1,11 @@
+{
+	"luci-app-bsagent-firewall": {
+		"description": "Manage bs_agent bench firewall mappings and the client allowlist",
+		"read": {
+			"uci": [ "bs-agent-firewall", "firewall", "network" ]
+		},
+		"write": {
+			"uci": [ "bs-agent-firewall", "firewall" ]
+		}
+	}
+}

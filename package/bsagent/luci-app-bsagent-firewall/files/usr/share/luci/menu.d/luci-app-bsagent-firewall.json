@@ -1,0 +1,14 @@
+{
+	"admin/network/firewall/benches": {
+		"title": "Bench Mappings",
+		"order": 90,
+		"action": {
+			"type": "view",
+			"path": "network/firewall/benches"
+		},
+		"depends": {
+			"acl": [ "luci-app-bsagent-firewall" ],
+			"fs": { "/etc/config/firewall": "file" }
+		}
+	}
+}
