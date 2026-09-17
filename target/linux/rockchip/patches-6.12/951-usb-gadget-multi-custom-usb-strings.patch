@@ -1,0 +1,40 @@
+From: syabyr <syabyr@github.com>
+Date: Thu, 17 Sep 2026 18:00:00 +0800
+Subject: [PATCH] usb: gadget: multi: custom manufacturer and product strings
+
+The LubanCat 1N exposes its Type-C download port through the built-in
+g_multi composite gadget.  With the stock strings the device shows up
+on a connected PC as "Linux Foundation Multifunction Composite Gadget":
+the manufacturer string is empty, so the host falls back to the
+VID 0x1d6b (Linux Foundation) database name, and the product string is
+the generic driver description.
+
+Give the device product-specific strings: manufacturer "Imotion",
+product "bsAgent".  VID/PID are left untouched so host-side RNDIS
+driver binding and usbutils device detection keep working.
+
+Signed-off-by: syabyr <syabyr@github.com>
+---
+ drivers/usb/gadget/legacy/multi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+--- a/drivers/usb/gadget/legacy/multi.c
++++ b/drivers/usb/gadget/legacy/multi.c
+@@ -22,7 +22,7 @@
+ #endif
+ 
+ 
+-#define DRIVER_DESC		"Multifunction Composite Gadget"
++#define DRIVER_DESC		"bsAgent"
+ 
+ MODULE_DESCRIPTION(DRIVER_DESC);
+ MODULE_AUTHOR("Michal Nazarewicz");
+@@ -82,7 +82,7 @@
+ };
+ 
+ static struct usb_string strings_dev[] = {
+-	[USB_GADGET_MANUFACTURER_IDX].s = "",
++	[USB_GADGET_MANUFACTURER_IDX].s = "Imotion",
+ 	[USB_GADGET_PRODUCT_IDX].s = DRIVER_DESC,
+ 	[USB_GADGET_SERIAL_IDX].s = "",
+ 	[MULTI_STRING_RNDIS_CONFIG_IDX].s = "Multifunction with RNDIS",
