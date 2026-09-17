@@ -125,7 +125,11 @@ define Device/embedfire_lubancat-1n
   DEVICE_VENDOR := EmbedFire
   DEVICE_MODEL := LubanCat 1N
   DEVICE_DTS := rk3566-lubancat-1n
-  DEVICE_PACKAGES := r8169-firmware luci-app-bsagent-firewall kmod-usbcanfd
+  # r8169 as a module: kmod_loader loads it in preinit, after the built-in
+  # gmac platform device has claimed eth0.  Built-in r8169 links before the
+  # dwmac driver and steals eth0, inverting the WAN/LAN roles assumed by
+  # 02_network (gmac = eth0 = WAN, r8169 = eth1 = LAN).
+  DEVICE_PACKAGES := kmod-r8169 luci-app-bsagent-firewall kmod-usbcanfd
 endef
 TARGET_DEVICES += embedfire_lubancat-1n
 
