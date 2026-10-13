@@ -28,3 +28,18 @@ set bench_map_ips {
 	auto-merge
 	flags interval
 }
+
+# Same fail-safe treatment for @allowed_bench_clients, which the input_wan
+# guard also references. Unlike bench_map_ips there is no companion
+# `config ipset` section -- the set only exists when fw4 renders it from a
+# redirect carrying `option ipset allowed_bench_clients`. On a sysupgrade
+# that keeps a default (bench-less) /etc/config/firewall, no such redirect
+# exists, the set never gets defined, and the guard's reference leaves the
+# WHOLE ruleset failing to render ("fw4 restart" dies with
+# 'Error: No such file or directory'). An always-present empty set degrades
+# the guard to a no-op instead. When a bench redirect is present, nft
+# merges the fw4-rendered set (with entries) over this stub.
+set allowed_bench_clients {
+	type ipv4_addr
+}
+
