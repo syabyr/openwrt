@@ -1,0 +1,16 @@
+#!/bin/sh /etc/rc.common
+# adbd (Debian glibc bundle under /opt/adbd) providing adb-over-network on
+# tcp:5555. Required by rknn-toolkit2 on the PC to reach rknn_server via
+# `adb forward`. Runs through its own loader since the target is musl.
+
+USE_PROCD=1
+START=98
+
+start_service() {
+	procd_open_instance
+	procd_set_param command /opt/adbd/ld-linux-aarch64.so.1 --library-path /opt/adbd /opt/adbd/adbd
+	procd_set_param respawn
+	procd_set_param stderr 1
+	procd_set_param output /tmp/adbd.log
+	procd_close_instance
+}

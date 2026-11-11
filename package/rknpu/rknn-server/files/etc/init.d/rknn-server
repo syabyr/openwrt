@@ -1,0 +1,37 @@
+#!/bin/sh /etc/rc.common
+# RKNN Toolkit2 board-side services for rknn_server connectivity.
+#
+# Two pieces run here; adbd comes from the separate adbd package
+# (/etc/init.d/adbd):
+#   1. rknn_server      - RKNN proxy, listens on abstract unix socket
+#                         @transfer_proxy (glibc binary on musl: wrapper at
+#                         /usr/bin/rknn_server injects libgcompat via
+#                         LD_PRELOAD, real binary is /usr/lib/rknn_server)
+#   2. transfer_proxy_relay - adbd resolves the toolkit's forward spec
+#                         "local:<name>" as /dev/socket/<name>, while
+#                         rknn_server listens on @transfer_proxy; the relay
+#                         bridges the two
+
+USE_PROCD=1
+START=99
+
+start_service() {
+	mkdir -p /dev/socket
+
+	procd_open_instance
+	procd_set_param command /usr/bin/transfer_proxy_relay
+	procd_set_param respawn
+	procd_set_param stderr 1
+	procd_set_param output /tmp/relay.log
+	procd_close_instance
+
+	# rknn_server deliberately runs OUTSIDE procd: the PC toolkit kills and
+	# restarts it on every connect (killall + `nohup /usr/bin/rknn_server`),
+	# so procd respawn would race the toolkit's own instance.
+	/usr/bin/rknn_server &
+}
+
+stop_service() {
+	killall rknn_server 2>/dev/null
+	return 0
+}

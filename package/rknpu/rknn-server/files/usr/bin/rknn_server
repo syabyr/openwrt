@@ -1,0 +1,3 @@
+#!/bin/sh
+export LD_PRELOAD=/usr/lib/libgcompat.so
+exec /usr/lib/rknn_server "$@" > /tmp/rknn-last.log 2>&1
